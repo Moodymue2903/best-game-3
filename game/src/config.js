@@ -2,6 +2,11 @@
 // sees the whole design in a few lines: 7 sky islands, 5 bird types,
 // 4 Storm Crow types, 8 Sky Relics, and the tuning constants. Nothing here
 // is a placeholder; every row is live in the sim and the render.
+//
+// The verb, stated once: unlike ground-based herding games, SKYFLOCK's
+// verb is color-matching: you drag birds to perches of their own color;
+// wrong colors refuse. The challenge is triage under crow pressure, not
+// spatial flocking.
 
 // --- Bird types: the five migrants. A bird roosts only on a perch of its
 // own color; that one rule is the whole verb. -------------------------------
@@ -29,36 +34,43 @@ export const SKYFLOCK_ISLANDS = [
   {
     key: 'sunset', name: 'Sunset Roost', skyTop: '#2b1a6e', skyBottom: '#ff3b8e',
     cloud: '#ffd9ec', accent: '#ffc53d', stars: 40, condition: 'Golden hour, gentle wind.',
+    adds: 'Teaches matching: 2 colors, 2 perches, Swift Crows only.',
     colors: [0, 1], birds: 12, spawnEvery: 5.0, crowEvery: 14, crowKinds: ['swift'], duration: 90,
   },
   {
     key: 'aurora', name: 'Aurora Aerie', skyTop: '#0b1e4b', skyBottom: '#123f7a',
     cloud: '#cfe8ff', accent: '#5ef2ff', stars: 90, condition: 'Aurora ribbons ripple overhead.',
+    adds: 'Adds Azure Blue: 3 colors, 3 perches; Shielded Crows arrive.',
     colors: [0, 1, 2], birds: 13, spawnEvery: 4.6, crowEvery: 12, crowKinds: ['swift', 'shielded'], duration: 90,
   },
   {
     key: 'monsoon', name: 'Monsoon Perch', skyTop: '#1a2a78', skyBottom: '#3d6fb4',
     cloud: '#dfe9f5', accent: '#2ee6d6', stars: 20, condition: 'Warm rain streaks the sky.',
+    adds: 'Adds Minty Cyan: 4 colors, 4 perches; Swarmer Crows arrive in threes.',
     colors: [0, 1, 2, 3], birds: 14, spawnEvery: 4.3, crowEvery: 11, crowKinds: ['swift', 'shielded', 'swarmer'], duration: 90,
   },
   {
     key: 'eclipse', name: 'Eclipse Eyrie', skyTop: '#12082e', skyBottom: '#4b1e5e',
     cloud: '#e8d5ff', accent: '#ff6fb5', stars: 120, condition: 'The sun wears a black crown.',
+    adds: 'Adds Pippa Pink: all 5 colors, 5 perches; Brute Crows arrive.',
     colors: [0, 1, 2, 3, 4], birds: 14, spawnEvery: 4.0, crowEvery: 10, crowKinds: ['swift', 'shielded', 'swarmer', 'brute'], duration: 90,
   },
   {
     key: 'dawn', name: 'Dawn Haven', skyTop: '#3a2a8e', skyBottom: '#ffb347',
     cloud: '#fff5e0', accent: '#ffc53d', stars: 50, condition: 'First light, fast wings.',
+    adds: 'Fastest spawn (3.8s); all 5 colors and all 4 crow kinds; first-light gold sky.',
     colors: [0, 1, 2, 3, 4], birds: 15, spawnEvery: 3.8, crowEvery: 9, crowKinds: ['swift', 'shielded', 'swarmer', 'brute'], duration: 90,
   },
   {
     key: 'storm', name: 'Storm Spire', skyTop: '#101c3f', skyBottom: '#5e2a6e',
     cloud: '#cfc4e8', accent: '#5ef2ff', stars: 30, condition: 'Lightning walks the clouds.',
+    adds: 'Fastest crows (every 8s); lightning walks the clouds.',
     colors: [0, 1, 2, 3, 4], birds: 16, spawnEvery: 3.5, crowEvery: 8, crowKinds: ['swift', 'shielded', 'swarmer', 'brute'], duration: 90,
   },
   {
     key: 'maelstrom', name: 'The Maelstrom', skyTop: '#160a2e', skyBottom: '#7a1030',
-    cloud: '#f5c6d8', accent: '#ff4d5e', stars: 70, condition: 'The giant crow circles. Zap it five times while it circles.',
+    cloud: '#f5c6d8', accent: '#ff4d5e', stars: 70, condition: 'The giant crow circles, dives at a bird, returns. Zap only while it circles.',
+    adds: 'Boss island: no clock, 8 birds already circling; the boss circles the tree, dives at a bird, and returns — zap it only while it circles, and re-route birds between perches while you wait for the opening.',
     colors: [0, 1, 2, 3, 4], birds: 8, spawnEvery: 8.0, crowEvery: 12, crowKinds: ['swift', 'shielded'], duration: 0,
   },
 ];

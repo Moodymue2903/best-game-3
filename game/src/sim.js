@@ -8,6 +8,9 @@
 // Crows dive in to scatter unroosted birds; click one to zap it with a
 // Spark. Roost 8 birds and the wave clears; clear wave 7's boss and the
 // sanctuary is saved.
+//
+// Unlike ground-based herding games, this is color-matching, not
+// flocking: the bird's color, not its position, decides its perch.
 
 import { makeRng } from './random.js';
 import {
@@ -619,7 +622,10 @@ export function stepGame(state, dt) {
   }
   state.crows = state.crows.filter((c) => c.state !== 'dead' && c.y > -90 && c.x > -90 && c.x < 1370);
 
-  // The Maelstrom: circles the tree, then dives at a bird.
+  // The Maelstrom boss is a pattern, not a click target: it circles the
+  // tree, dives at a bird, and returns to its orbit. It can only be zapped
+  // while it circles, so the fight is waiting for the opening while you
+  // keep re-routing birds between perches under crow pressure.
   const boss = state.boss;
   if (boss) {
     boss.wing += dt * 10;

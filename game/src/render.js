@@ -504,6 +504,20 @@ function drawBird(ctx, bird, time, dragged) {
   ctx.lineWidth = 2;
   ctx.strokeStyle = OUTLINE;
   ctx.stroke();
+  // Sulking: a wrong-color drop leaves the bird visibly refusing — a red
+  // cross above it, so the refusal reads in a still frame (the two-state
+  // cover shows match and sulk side by side).
+  if (bird.state === 'sulking') {
+    ctx.strokeStyle = '#ff2e4d';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-7, -32);
+    ctx.lineTo(7, -20);
+    ctx.moveTo(7, -32);
+    ctx.lineTo(-7, -20);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
@@ -675,6 +689,46 @@ function drawBoss(ctx, boss, time) {
   ctx.restore();
 }
 
+function drawZapBolt(ctx, zap, time) {
+  // A cyan lightning bolt frozen mid-arc (staging only): the game's zap
+  // effect, held still so the boss frame shows the fight, not just the
+  // boss. The bolt runs from above the Skytree canopy to the struck crow.
+  const x0 = 640;
+  const y0 = 310;
+  const x1 = zap.x;
+  const y1 = zap.y;
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  const len = Math.hypot(dx, dy) || 1;
+  const px = -dy / len;
+  const py = dx / len;
+  const jogs = [0, -26, 18, -14, 10, 0];
+  const pts = jogs.map((j, i) => {
+    const t = i / (jogs.length - 1);
+    return [x0 + dx * t + px * j, y0 + dy * t + py * j];
+  });
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  for (const [color, width, alpha] of [['#5ef2ff', 12, 0.45], ['#ffffff', 4, 1]]) {
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    pts.forEach(([x, y], i) => { if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  // Ring around the struck boss.
+  ctx.beginPath();
+  ctx.arc(x1, y1, 52, 0, Math.PI * 2);
+  ctx.strokeStyle = '#5ef2ff';
+  ctx.lineWidth = 4;
+  ctx.stroke();
+  ctx.restore();
+  void time;
+}
+
 // --- HUD -------------------------------------------------------------------
 
 function drawPill(ctx, x, y, w, h, label, value, valueColor) {
@@ -690,6 +744,9 @@ function formatTime(seconds) {
 
 function drawHUD(ctx, state, time) {
   const isl = island(state);
+  // Top bar (hidden on the cover frame, where the wordmark banner carries
+  // the title alone and the pills would compete with it).
+  if (!state.coverHideTopHud) {
   // Top bar, left: wave + island.
   drawPill(ctx, 16, 14, 150, 46, 'WAVE', `${state.wave}/7`, '#ffffff');
   chunkyText(ctx, isl.name.toUpperCase(), 176, 37, 20, GOLD, 'left', 4);
@@ -722,6 +779,7 @@ function drawHUD(ctx, state, time) {
     ctx.fillRect(-6, -6, 12, 12);
     ctx.strokeRect(-6, -6, 12, 12);
     ctx.restore();
+  }
   }
 
   // Bottom-left: Skytree HP hearts + crowd warning.
@@ -786,18 +844,31 @@ function drawHUD(ctx, state, time) {
         if (d < bestD) { bestD = d; best = p; }
       }
       if (best) {
-        const def = SKYFLOCK_BIRD_TYPES[best.color];
+        const match = bird.color === best.color;
+        // Golden tether ribbon: a gold underlay beneath the colored dash,
+        // so the guide reads as a wind-current, not a debug line.
         ctx.save();
         ctx.setLineDash([8, 8]);
+        ctx.lineWidth = 7;
+        ctx.strokeStyle = GOLD;
+        ctx.beginPath();
+        ctx.moveTo(bird.x, bird.y);
+        ctx.lineTo(best.x, best.y);
+        ctx.stroke();
         ctx.lineWidth = 3;
-        ctx.strokeStyle = bird.color === best.color ? '#7dff9e' : '#ff5b6e';
+        ctx.strokeStyle = match ? '#7dff9e' : '#ff5b6e';
         ctx.beginPath();
         ctx.moveTo(bird.x, bird.y);
         ctx.lineTo(best.x, best.y);
         ctx.stroke();
         ctx.restore();
-        chunkyText(ctx, bird.color === best.color ? 'MATCH!' : 'WRONG COLOR', best.x, best.y - 44, 15, bird.color === best.color ? '#7dff9e' : '#ff5b6e', 'center', 4);
-        void def;
+        // The match cue is a chunky gold-bordered chip in the HUD's own
+        // language, never a bare floating label.
+        const cue = match ? 'MATCH!' : 'WRONG COLOR';
+        ctx.font = '900 20px "Arial Black", sans-serif';
+        const cueW = ctx.measureText(cue).width + 28;
+        goldPanel(ctx, best.x - cueW / 2, best.y - 74, cueW, 36, 10);
+        chunkyText(ctx, cue, best.x, best.y - 50, 20, match ? '#7dff9e' : '#ff5b6e', 'center', 4);
       }
     }
   }
@@ -822,7 +893,7 @@ function drawTitle(ctx, state, time) {
   }
   // Wordmark.
   goldText(ctx, 'SKYFLOCK', 640, 128, 92);
-  chunkyText(ctx, 'A  SKYWARDEN’S  MIGRATION', 640, 196, 22, CREAM, 'center', 5);
+  chunkyText(ctx, 'A  SKYWARDEN MIGRATION', 640, 196, 22, CREAM, 'center', 5);
   // How to play panel.
   goldPanel(ctx, 290, 236, 700, 118, 16);
   chunkyText(ctx, 'HOW TO PLAY', 640, 262, 18, GOLD, 'center', 0);
@@ -999,7 +1070,15 @@ function drawEndScreen(ctx, state, time) {
   const won = state.screen === 'victory';
   const isl = island(state);
   drawCloud(ctx, 120, 120, 1.0, isl.cloud, time, 6);
-  drawCloud(ctx, 1050, 620, 0.8, isl.cloud, time, 8);
+  drawCloud(ctx, 1160, 110, 0.8, isl.cloud, time, 8);
+  // Victory tableau: two roosted birds on glowing perches, drawn over the
+  // backdrop so the end screen still reads as THIS game, not a template.
+  if (won) {
+    for (const t of [{ x: 200, y: 570, color: 0 }, { x: 1080, y: 570, color: 2 }]) {
+      drawPerch(ctx, { x: t.x, y: t.y, color: t.color, index: 0, birdId: 1 }, time);
+      drawBird(ctx, { x: t.x, y: t.y, color: t.color, wing: time * 2, state: 'roosted', orbitSpeed: 0 }, time, false);
+    }
+  }
   if (won) {
     goldText(ctx, 'SANCTUARY SAVED!', 640, 150, 64);
     chunkyText(ctx, 'The Maelstrom is gone. The migration rests in the Skytree.', 640, 222, 20, CREAM, 'center', 4);
@@ -1012,7 +1091,7 @@ function drawEndScreen(ctx, state, time) {
     };
     chunkyText(ctx, reasons[state.defeatReason] || 'The migration is lost.', 640, 222, 20, CREAM, 'center', 4);
   }
-  goldPanel(ctx, 440, 270, 400, 210, 18);
+  goldPanel(ctx, 390, 250, 500, 240, 18);
   const rows = [
     ['FINAL SCORE', String(state.score)],
     ['ROOSTS', String(state.stats.roosts)],
@@ -1021,9 +1100,9 @@ function drawEndScreen(ctx, state, time) {
     ['NESTING CHESTS', String(state.stats.chests)],
   ];
   rows.forEach(([label, value], i) => {
-    const y = 300 + i * 34;
-    chunkyText(ctx, label, 470, y, 15, '#9fb4ff', 'left', 0);
-    chunkyText(ctx, value, 810, y, 17, '#ffffff', 'right', 0);
+    const y = 292 + i * 38;
+    chunkyText(ctx, label, 420, y, 15, '#9fb4ff', 'left', 2);
+    chunkyText(ctx, value, 860, y, 22, '#ffffff', 'right', 2);
   });
   const b = SKYFLOCK_LAYOUT.restartButton;
   rr(ctx, b.x, b.y, b.w, b.h, 18);
@@ -1117,6 +1196,7 @@ export function drawGame(ctx, state, particles, time) {
   }
   for (const crow of state.crows) drawCrow(ctx, crow, time);
   if (state.boss) drawBoss(ctx, state.boss, time);
+  if (state.bossZap) drawZapBolt(ctx, state.bossZap, time);
   drawParticles(ctx, particles);
   drawHUD(ctx, state, time);
   // The cover frame carries the baked-in wordmark (staging only): a
@@ -1124,9 +1204,12 @@ export function drawGame(ctx, state, particles, time) {
   // reads as a deliberate title card and never collides with the HUD
   // pills or the Skytree canopy behind it.
   if (state.coverWordmark) {
-    goldPanel(ctx, 360, 84, 560, 100, 18);
-    goldText(ctx, 'SKYFLOCK', 640, 126, 52);
-    chunkyText(ctx, 'GUIDE THE MIGRATION  ·  ZAP THE STORM CROWS', 640, 166, 15, CREAM, 'center', 3);
+    // With the top HUD pills hidden, the banner rides higher so it reads
+    // as the title card at the top of the frame, not a floating band.
+    const wy = state.coverHideTopHud ? 44 : 84;
+    goldPanel(ctx, 360, wy, 560, 100, 18);
+    goldText(ctx, 'SKYFLOCK', 640, wy + 42, 52);
+    chunkyText(ctx, 'GUIDE THE MIGRATION  ·  ZAP THE STORM CROWS', 640, wy + 82, 15, CREAM, 'center', 3);
   }
   if (state.screen === 'relic') drawRelicScreen(ctx, state, time);
   if (state.screen === 'victory' || state.screen === 'defeat') drawEndScreen(ctx, state, time);

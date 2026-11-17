@@ -5,7 +5,7 @@
 - **WIN:** Clear Wave 7 — zap The Maelstrom 5 times.
 - **LOSE:** 5 unroosted birds crowd the tree for 5s · 10 birds scattered in a wave · Skytree HP hits 0.
 - **Controls:** drag birds to matching perches · click crows to zap · Space zaps the nearest crow · R restart · M mute.
-- **Progression:** 7 sky islands (Sunset, Aurora, Monsoon, Eclipse, Dawn, Storm, Maelstrom), 5 bird types, 4 Storm Crow types, 8 Sky Relics drafted one per cleared wave, Nesting Chest rewards.
+- **Progression:** 7 sky islands (Sunset, Aurora, Monsoon, Eclipse, Dawn, Storm, Maelstrom), 5 bird types, 4 Storm Crow types, 8 Sky Relics drafted one per cleared wave, Nesting Chest rewards. The Maelstrom circles the tree, dives at a bird, and returns — zap it only while it circles, and re-route birds between perches while you wait for the opening.
 - **Tech:** HTML5 canvas + vanilla JS, WebAudio synth only, no network requests, no libraries. `game/index.html` opens in desktop Chrome and plays offline.
 
 ## Verify
