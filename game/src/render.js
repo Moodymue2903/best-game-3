@@ -105,10 +105,11 @@ function drawSky(ctx, isl, time) {
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 1280, 720);
 
-  // Stars, twinkling.
+  // Stars, twinkling — drifting almost imperceptibly, the far parallax
+  // layer. The whole sky moves, just at different speeds per layer.
   ctx.fillStyle = '#ffffff';
   for (let i = 0; i < isl.stars; i += 1) {
-    const sx = (i * 173 + 41) % 1280;
+    const sx = ((i * 173 + 41 + time * 2) % 1280 + 1280) % 1280;
     const sy = (i * 97 + 23) % 300;
     const tw = 0.35 + 0.65 * Math.abs(Math.sin(time * 1.3 + i));
     ctx.globalAlpha = tw;
@@ -206,12 +207,25 @@ function drawCloud(ctx, x, y, scale, color, time, drift) {
 }
 
 function drawClouds(ctx, isl, time) {
-  drawCloud(ctx, 120, 120, 1.0, isl.cloud, time, 6);
-  drawCloud(ctx, 520, 70, 0.8, isl.cloud, time, 9);
-  drawCloud(ctx, 900, 150, 1.1, isl.cloud, time, 5);
-  drawCloud(ctx, 220, 640, 0.9, isl.cloud, time, 7);
-  drawCloud(ctx, 1050, 620, 0.8, isl.cloud, time, 8);
-  drawCloud(ctx, 640, 250, 0.6, isl.cloud, time, 11);
+  // Parallax sky: three layers at three depths. Far clouds are small,
+  // pale and slow; near clouds are big, bright and fast. The differential
+  // drift is what reads as depth, not wallpaper — the layers slide past
+  // each other and past the island at different speeds.
+  ctx.save();
+  ctx.globalAlpha = 0.6;
+  drawCloud(ctx, 200, 90, 0.55, isl.cloud, time, 3);
+  drawCloud(ctx, 720, 60, 0.5, isl.cloud, time, 3.5);
+  drawCloud(ctx, 1120, 120, 0.6, isl.cloud, time, 2.5);
+  ctx.restore();
+  ctx.save();
+  ctx.globalAlpha = 0.85;
+  drawCloud(ctx, 120, 150, 0.9, isl.cloud, time, 7);
+  drawCloud(ctx, 900, 180, 1.0, isl.cloud, time, 6);
+  drawCloud(ctx, 520, 90, 0.8, isl.cloud, time, 8);
+  ctx.restore();
+  drawCloud(ctx, 300, 640, 1.3, isl.cloud, time, 13);
+  drawCloud(ctx, 1060, 620, 1.25, isl.cloud, time, 14);
+  drawCloud(ctx, 640, 70, 1.2, isl.cloud, time, 12);
 }
 
 // --- The floating sanctuary island + the Skytree ---------------------------
@@ -220,6 +234,12 @@ function drawFloatingIsland(ctx, time) {
   const bob = Math.sin(time * 0.8) * 3;
   const cx = 640;
   const top = 596 + bob;
+  // The island bobs and tilts a degree or so with the wave, so the
+  // sanctuary reads as a floating body, not a painted backdrop.
+  ctx.save();
+  ctx.translate(640, 650);
+  ctx.rotate(Math.sin(time * 0.6) * 0.02);
+  ctx.translate(-640, -650);
   // Rock: a chunky upside-down cone with a gold trim.
   ctx.save();
   ctx.beginPath();
@@ -290,6 +310,60 @@ function drawFloatingIsland(ctx, time) {
     ctx.stroke();
   }
   ctx.restore();
+  ctx.restore(); // end island tilt
+}
+
+// --- Shadows: the single cheapest depth cue. Every bird and crow casts a
+// soft ellipse on the island grass below it; the shadow shrinks and fades
+// as the bird climbs, and grows and sharpens as it descends toward a
+// perch. The Skytree shadows the grass at its base, and the island
+// itself leaves a faint grounding shadow underneath.
+function groundShadow(ctx, x, y, size, maxAlpha) {
+  const groundY = 600;
+  const h = Math.max(0, groundY - y);
+  const prox = Math.max(0.12, Math.min(1, 1 - h / 420));
+  // Fade past the island's grass edges so no shadow floats on bare sky.
+  const edge = Math.max(0, 1 - Math.abs(x - 640) / 330);
+  const a = maxAlpha * prox * edge;
+  if (a <= 0.015) return;
+  const rx = size * prox + 5;
+  ctx.save();
+  ctx.fillStyle = '#1a1030';
+  ctx.globalAlpha = a * 0.55;
+  ctx.beginPath();
+  ctx.ellipse(x - 12 * prox, groundY + 5, rx * 1.35, rx * 0.42, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = a;
+  ctx.beginPath();
+  ctx.ellipse(x - 12 * prox, groundY + 5, rx, rx * 0.3, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawShadows(ctx, state) {
+  // Skytree shadow on the grass at the trunk's base.
+  ctx.save();
+  ctx.globalAlpha = 0.2;
+  ctx.fillStyle = '#1a1030';
+  ctx.beginPath();
+  ctx.ellipse(618, 602, 120, 14, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  // Faint grounding shadow under the floating island.
+  ctx.save();
+  ctx.globalAlpha = 0.07;
+  ctx.fillStyle = '#1a1030';
+  ctx.beginPath();
+  ctx.ellipse(640, 714, 260, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  for (const bird of state.birds) {
+    groundShadow(ctx, bird.x, bird.y, 13, 0.34);
+  }
+  for (const crow of state.crows) {
+    groundShadow(ctx, crow.x, crow.y, crow.radius * 0.9, 0.4);
+  }
+  if (state.boss) groundShadow(ctx, state.boss.x, state.boss.y, 46, 0.42);
 }
 
 function drawSkytree(ctx, state, time) {
@@ -297,6 +371,12 @@ function drawSkytree(ctx, state, time) {
   const bob = Math.sin(time * 0.8) * 3;
   ctx.save();
   ctx.translate(0, bob);
+  // Gentle sway: the tree leans a fraction of a degree around its base,
+  // in time with the island's bob, so the canopy feels alive rather than
+  // pasted on.
+  ctx.translate(x, y + 196);
+  ctx.rotate(Math.sin(time * 0.5) * 0.012);
+  ctx.translate(-x, -(y + 196));
   // Canopy: three big glossy leaf blobs.
   const canopy = [
     [x - 78, y - 148, 78, '#2fbf71'],
@@ -365,6 +445,10 @@ function drawSkytree(ctx, state, time) {
 
 // --- Perches, birds, crows, boss -------------------------------------------
 
+// Roost ring pulses, render-only memory: when a perch becomes occupied,
+// a gold ring expands from it for 0.7s. The sim never sees this.
+const perchRingStart = new WeakMap();
+
 function drawPerch(ctx, perch, time) {
   const def = SKYFLOCK_BIRD_TYPES[perch.color];
   const pulse = 1 + 0.08 * Math.sin(time * 3 + perch.index * 1.7);
@@ -414,14 +498,66 @@ function drawPerch(ctx, perch, time) {
     ctx.strokeStyle = '#8a5a12';
     ctx.stroke();
   }
+  // Roost ring pulse: a gold ring expanding from the perch for 0.7s after
+  // a bird lands on it, so the roost reads as an event, not a state change.
+  if (perch.birdId !== null) {
+    if (!perchRingStart.has(perch)) perchRingStart.set(perch, time);
+    const age = time - perchRingStart.get(perch);
+    if (age < 0.7) {
+      ctx.save();
+      ctx.globalAlpha = (1 - age / 0.7) * 0.85;
+      ctx.strokeStyle = GOLD;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(perch.x, perch.y, r + 10 + age * 110, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  } else {
+    perchRingStart.delete(perch);
+  }
+}
+
+function birdDepth(bird) {
+  // Where the bird sits on its orbit ellipse: 0 = far side (top of the
+  // orbit — small and dim), 1 = near side (bottom — big and bright).
+  // Staged birds without an orbit angle read as mid-depth.
+  if (!Number.isFinite(bird.angle)) return 0.5;
+  return (Math.sin(bird.angle) + 1) / 2;
 }
 
 function drawBird(ctx, bird, time, dragged) {
   const def = birdDef(bird);
+  const depth = birdDepth(bird);
+  // Depth scale: far birds shrink to 0.82x, near birds grow to 1.18x, so
+  // the orbit reads as a 3D ring around the Skytree, not a flat circle.
+  const depthScale = 0.82 + 0.36 * depth;
   const r = 14;
   const flap = Math.sin(bird.wing);
   ctx.save();
-  ctx.translate(bird.x, bird.y);
+  ctx.translate(bird.x, bird.y + Math.sin(bird.wing) * 1.5);
+  // Bank into the orbit: a gentle lean along the direction of travel.
+  if ((bird.state === 'circling' || bird.state === 'incoming') && Number.isFinite(bird.angle)) {
+    const dir = (bird.orbitSpeed || 0) >= 0 ? 1 : -1;
+    ctx.rotate(Math.cos(bird.angle) * 0.12 * dir);
+  } else if (bird.state === 'sulking' || bird.state === 'scattered' || bird.state === 'leaving') {
+    const bank = Math.atan2(bird.vy || 0, bird.vx || 0) * 0.2;
+    ctx.rotate(Math.max(-0.3, Math.min(0.3, bank)));
+  }
+  // Squash on roost landing, stretch on takeoff (render-only: the sim's
+  // roostTimer counts down from 8, so the first and last 0.35s are the
+  // squash and the stretch).
+  let squashX = 1;
+  let squashY = 1;
+  if (bird.state === 'roosted' && typeof bird.roostTimer === 'number') {
+    const land = Math.max(0, 1 - (8 - bird.roostTimer) / 0.35);
+    const lift = Math.max(0, 1 - bird.roostTimer / 0.35);
+    squashX = 1 + 0.22 * land - 0.12 * lift;
+    squashY = 1 - 0.22 * land + 0.18 * lift;
+  }
+  ctx.scale(squashX * depthScale, squashY * depthScale);
+  // Far birds read dimmer — atmospheric perspective.
+  ctx.globalAlpha = 0.78 + 0.22 * depth;
   // Motion trail for flying birds: three fading dots behind.
   if (bird.state === 'incoming' || bird.state === 'circling') {
     const dir = bird.orbitSpeed >= 0 ? -1 : 1;
@@ -504,6 +640,16 @@ function drawBird(ctx, bird, time, dragged) {
   ctx.lineWidth = 2;
   ctx.strokeStyle = OUTLINE;
   ctx.stroke();
+  // Atmospheric veil over far birds: a cool tint that fades with depth,
+  // so the far side of the ring sits further back in the sky.
+  if (depth < 0.95) {
+    ctx.globalAlpha = (1 - depth) * 0.22;
+    ctx.fillStyle = '#5a6bb0';
+    ctx.beginPath();
+    ctx.arc(0, 0, r + 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
   // Sulking: a wrong-color drop leaves the bird visibly refusing — a red
   // cross above it, so the refusal reads in a still frame (the two-state
   // cover shows match and sulk side by side).
@@ -521,12 +667,28 @@ function drawBird(ctx, bird, time, dragged) {
   ctx.restore();
 }
 
-function drawCrow(ctx, crow, time) {
+function drawCrow(ctx, crow, state, time) {
   const def = SKYFLOCK_CROW_TYPES.find((c) => c.key === crow.kind);
   const r = crow.radius;
   const flap = Math.sin(crow.wing);
   ctx.save();
   ctx.translate(crow.x, crow.y);
+  // Bank into the dive: the crow leans toward whatever it is hunting
+  // (the nearest circling bird, or the Skytree itself).
+  if (crow.state === 'retreat') {
+    ctx.rotate((crow.x < 640 ? -1 : 1) * 0.25);
+  } else {
+    let tx = 640;
+    let ty = 400;
+    let bestD = Infinity;
+    for (const b of state.birds) {
+      if (b.state !== 'incoming' && b.state !== 'circling') continue;
+      const d = (b.x - crow.x) ** 2 + (b.y - crow.y) ** 2;
+      if (d < bestD) { bestD = d; tx = b.x; ty = b.y; }
+    }
+    const heading = Math.atan2(ty - crow.y, tx - crow.x);
+    ctx.rotate(Math.max(-0.35, Math.min(0.35, heading * 0.25)));
+  }
   ctx.shadowColor = '#ff2e4d';
   ctx.shadowBlur = 14;
   // Ragged wings: jagged ink polygons.
@@ -614,13 +776,57 @@ function drawCrow(ctx, crow, time) {
   ctx.restore();
 }
 
-function drawBoss(ctx, boss, time) {
+function drawBoss(ctx, boss, state, time) {
   const r = 58;
   const flap = Math.sin(boss.wing);
+  // Lightning flicker: the boss's red glow stutters like a storm.
+  const flicker = 0.55 + 0.45 * Math.abs(Math.sin(time * 9.7) * Math.sin(time * 4.3));
   ctx.save();
   ctx.translate(boss.x, boss.y);
+  // Rotating storm ring: a dashed cyan ellipse that orbits the boss, so
+  // the Maelstrom reads as a 3D storm, not a flat sprite.
+  ctx.save();
+  ctx.globalAlpha = 0.5;
+  ctx.strokeStyle = '#5ef2ff';
+  ctx.lineWidth = 4;
+  ctx.setLineDash([18, 14]);
+  ctx.lineDashOffset = -time * 55;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 104, 74, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+  // Storm puffs riding the ring.
+  for (let i = 0; i < 3; i += 1) {
+    const a = time * 0.9 + (i / 3) * Math.PI * 2;
+    const px = Math.cos(a) * 104;
+    const py = Math.sin(a) * 74;
+    ctx.save();
+    ctx.globalAlpha = 0.85;
+    ctx.fillStyle = '#5b3a6e';
+    ctx.strokeStyle = OUTLINE;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(px, py, 13, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+  // Bank into the circle or the dive, then the body.
+  ctx.save();
+  if (boss.state === 'circle') {
+    ctx.rotate(Math.cos(boss.angle) * 0.15);
+  } else {
+    const target = boss.state === 'dive'
+      ? state.birds.find((b) => b.id === boss.targetBirdId)
+      : null;
+    const tx = target ? target.x : 640 + Math.cos(boss.angle) * 280;
+    const ty = target ? target.y : 400 + Math.sin(boss.angle) * 280 * 0.82;
+    const heading = Math.atan2(ty - boss.y, tx - boss.x);
+    ctx.rotate(Math.max(-0.35, Math.min(0.35, heading * 0.25)));
+  }
   ctx.shadowColor = '#ff2e4d';
-  ctx.shadowBlur = 34;
+  ctx.shadowBlur = 20 + flicker * 26;
   // Huge ragged wings.
   ctx.fillStyle = '#0d0815';
   ctx.strokeStyle = OUTLINE;
@@ -673,6 +879,23 @@ function drawBoss(ctx, boss, time) {
   ctx.lineWidth = 3;
   ctx.strokeStyle = OUTLINE;
   ctx.stroke();
+  ctx.restore(); // end bank — the HP bar and nameplate stay unrotated UI.
+  // Mini lightning flicker near the boss, stuttering with the storm.
+  if ((time * 0.9) % 1 < 0.06) {
+    const lx = Math.sin(time * 13.7) * 70;
+    const ly = -30 + Math.cos(time * 11.3) * 26;
+    ctx.save();
+    ctx.strokeStyle = '#bff4ff';
+    ctx.lineWidth = 3;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(lx, ly - 22);
+    ctx.lineTo(lx - 8, ly - 6);
+    ctx.lineTo(lx + 6, ly + 4);
+    ctx.lineTo(lx - 4, ly + 20);
+    ctx.stroke();
+    ctx.restore();
+  }
   // Boss HP bar above.
   const bw = 150;
   ctx.fillStyle = 'rgba(13,8,21,0.85)';
@@ -1181,24 +1404,67 @@ export function drawGame(ctx, state, particles, time) {
     drawTitle(ctx, state, time);
     return;
   }
+  // Zap juice, computed from the live bolt particle: a screen flash and a
+  // camera shake that decay with the bolt's life. Staged shots have no
+  // particles, so the stills never shake.
+  const bolt = particles.find((p) => p.kind === 'bolt');
+  const flash = bolt ? bolt.life / bolt.maxLife : 0;
+  const shake = flash * 7;
+  ctx.save();
+  if (shake > 0.2) {
+    ctx.translate(Math.sin(time * 97.3) * shake, Math.cos(time * 89.7) * shake);
+  }
   drawSky(ctx, isl, time);
   drawClouds(ctx, isl, time);
   drawFloatingIsland(ctx, time);
+  drawShadows(ctx, state);
   drawSkytree(ctx, state, time);
   for (const perch of state.perches) drawPerch(ctx, perch, time);
-  // Roosted birds sit on their perches; the rest fly.
-  for (const bird of state.birds) {
-    if (bird.state === 'roosted') continue;
+  // Flying birds draw far-to-near, so near birds overlap far birds and
+  // the orbit reads as a ring in 3D; the dragged bird draws last, on top.
+  const flying = state.birds
+    .filter((b) => b.state !== 'roosted')
+    .sort((a, b) => {
+      const da = state.drag && state.drag.birdId === a.id ? 2 : birdDepth(a);
+      const db = state.drag && state.drag.birdId === b.id ? 2 : birdDepth(b);
+      return da - db;
+    });
+  for (const bird of flying) {
     drawBird(ctx, bird, time, state.drag && state.drag.birdId === bird.id);
   }
   for (const bird of state.birds) {
     if (bird.state === 'roosted') drawBird(ctx, bird, time, false);
   }
-  for (const crow of state.crows) drawCrow(ctx, crow, time);
-  if (state.boss) drawBoss(ctx, state.boss, time);
+  for (const crow of state.crows) drawCrow(ctx, crow, state, time);
+  if (state.boss) drawBoss(ctx, state.boss, state, time);
   if (state.bossZap) drawZapBolt(ctx, state.bossZap, time);
   drawParticles(ctx, particles);
   drawHUD(ctx, state, time);
+  ctx.restore();
+  // Zap burst: cyan sparkles radiating from the strike while the flash lives.
+  if (bolt && flash > 0) {
+    ctx.save();
+    for (let i = 0; i < 10; i += 1) {
+      const a = (i / 10) * Math.PI * 2 + time * 2;
+      const rr2 = (1 - flash) * 64;
+      const sx = bolt.x + Math.cos(a) * rr2;
+      const sy = bolt.y + Math.sin(a) * rr2;
+      ctx.globalAlpha = flash;
+      ctx.fillStyle = i % 2 === 0 ? '#5ef2ff' : '#ffffff';
+      ctx.beginPath();
+      ctx.arc(sx, sy, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+  // Screen flash over the world (not the title card or the end screens).
+  if (flash > 0) {
+    ctx.save();
+    ctx.globalAlpha = flash * 0.3;
+    ctx.fillStyle = '#bff4ff';
+    ctx.fillRect(0, 0, 1280, 720);
+    ctx.restore();
+  }
   // The cover frame carries the baked-in wordmark (staging only): a
   // gold-bordered title banner across the top of the scene, so the name
   // reads as a deliberate title card and never collides with the HUD
